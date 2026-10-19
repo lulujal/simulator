@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulator Stack & Queue</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+
+    @keyframes slideInFromTop {
+      from { transform: translateY(-80px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes slideOutToTop {
+      from { transform: translateY(0); opacity: 1; }
+      to { transform: translateY(-80px); opacity: 0; }
+    }
+    @keyframes slideInFromRight {
+      from { transform: translateX(100px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOutToLeft {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(-100px); opacity: 0; }
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes bounceHighlight {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    @keyframes fadeInUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+      50% { box-shadow: 0 0 20px 6px rgba(99, 102, 241, 0.25); }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-4px); }
+      40% { transform: translateX(4px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+
+    .element-enter-stack { animation: slideInFromTop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+    .element-exit-stack { animation: slideOutToTop 0.4s ease-in forwards; }
+    .element-enter-queue { animation: slideInFromRight 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+    .element-exit-queue { animation: slideOutToLeft 0.4s ease-in forwards; }
+    .element-pop-in { animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+    .highlight-bounce { animation: bounceHighlight 0.6s ease-in-out; }
+    .log-enter { animation: fadeInUp 0.3s ease-out forwards; }
+    .pulse-glow { animation: pulseGlow 1.5s ease-in-out infinite; }
+    .shake-error { animation: shake 0.4s ease-in-out; }
+
+    .stack-element, .queue-element {
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .top-indicator {
+      background: linear-gradient(135deg, #f59e0b, #f97316);
+      color: white;
+      font-weight: 700;
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+      z-index: 10;
+    }
+
+    .front-indicator, .back-indicator {
+      font-weight: 700;
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      position: absolute;
+      top: -10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 10;
+    }
+    .front-indicator {
+      left: -5px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+    }
+    .back-indicator {
+      right: -5px;
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: white;
+    }
+
+    .container-stack {
+      background: linear-gradient(180deg, rgba(99,102,241,0.05) 0%, rgba(99,102,241,0.12) 100%);
+      border: 2px dashed rgba(99,102,241,0.3);
+      border-radius: 12px;
+      min-height: 280px;
+      position: relative;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: center;
+      padding: 16px 12px;
+      gap: 8px;
+    }
+
+    .container-queue {
+      background: linear-gradient(90deg, rgba(16,185,129,0.05) 0%, rgba(139,92,246,0.05) 100%);
+      border: 2px dashed rgba(16,185,129,0.3);
+      border-radius: 12px;
+      min-height: 100px;
+      position: relative;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      padding: 16px 12px;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .empty-msg {
+      color: var(--muted-foreground, #9ca3af);
+      font-style: italic;
+      font-size: 0.875rem;
+      opacity: 0.7;
+    }
+
+    .tab-btn {
+      padding: 10px 28px;
+      font-weight: 600;
+      font-size: 1rem;
+      border-radius: 12px 12px 0 0;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .tab-btn.active-stack {
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      color: white;
+      border-color: #6366f1;
+      box-shadow: 0 -4px 15px rgba(99,102,241,0.3);
+    }
+    .tab-btn.active-queue {
+      background: linear-gradient(135deg, #10b981, #34d399);
+      color: white;
+      border-color: #10b981;
+      box-shadow: 0 -4px 15px rgba(16,185,129,0.3);
+    }
+    .tab-btn:not(.active-stack):not(.active-queue) {
+      background: var(--card, #1e1e2e);
+      color: var(--muted-foreground, #9ca3af);
+      border-color: var(--border, #333);
+    }
+    .tab-btn:not(.active-stack):not(.active-queue):hover {
+      background: var(--accent, #2a2a3e);
+      color: var(--foreground, #e5e5e5);
+    }
+
+    .action-btn {
+      padding: 10px 20px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .action-btn:hover { transform: translateY(-2px); }
+    .action-btn:active { transform: translateY(0); }
+    .action-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-push {
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      color: white;
+      box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+    }
+    .btn-push:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+
+    .btn-pop {
+      background: linear-gradient(135deg, #ef4444, #f87171);
+      color: white;
+      box-shadow: 0 4px 12px rgba(239,68,68,0.3);
+    }
+    .btn-pop:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(239,68,68,0.4); }
+
+    .btn-enqueue {
+      background: linear-gradient(135deg, #10b981, #34d399);
+      color: white;
+      box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+    }
+    .btn-enqueue:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(16,185,129,0.4); }
+
+    .btn-dequeue {
+      background: linear-gradient(135deg, #f59e0b, #fbbf24);
+      color: #1e1e2e;
+      box-shadow: 0 4px 12px rgba(245,158,11,0.3);
+    }
+    .btn-dequeue:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(245,158,11,0.4); }
+
+    .btn-clear {
+      background: var(--card, #2a2a3e);
+      color: var(--muted-foreground, #9ca3af);
+      border: 1px solid var(--border, #444);
+    }
+    .btn-clear:hover:not(:disabled) {
+      color: #ef4444;
+      border-color: #ef4444;
+    }
+
+    .log-panel {
+      max-height: 250px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .log-panel::-webkit-scrollbar { width: 4px; }
+    .log-panel::-webkit-scrollbar-track { background: transparent; }
+    .log-panel::-webkit-scrollbar-thumb { background: var(--border, #444); border-radius: 4px; }
+
+    .log-entry {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .log-push { background: rgba(99,102,241,0.1); border-left: 3px solid #6366f1; }
+    .log-pop { background: rgba(239,68,68,0.1); border-left: 3px solid #ef4444; }
+    .log-enqueue { background: rgba(16,185,129,0.1); border-left: 3px solid #10b981; }
+    .log-dequeue { background: rgba(245,158,11,0.1); border-left: 3px solid #f59e0b; }
+    .log-info { background: rgba(148,163,184,0.1); border-left: 3px solid #94a3b8; }
+
+    input[type="text"], input[type="number"] {
+      background: var(--content, #1e1e2e);
+      color: var(--foreground, #e5e5e5);
+      border: 2px solid var(--border, #444);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      width: 100%;
+    }
+    input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+
+    .concept-card {
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .stack-concept {
+      background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(99,102,241,0.15));
+      border: 1px solid rgba(99,102,241,0.2);
+    }
+    .queue-concept {
+      background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(16,185,129,0.15));
+      border: 1px solid rgba(16,185,129,0.2);
+    }
+
+    .status-bar {
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .arrow-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted-foreground, #9ca3af);
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="bg-[var(--background,#0f0f1a)] text-[var(--foreground,#e5e5e5)] antialiased p-4 min-h-screen">
+
+  <div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent mb-2">
+        📚 Simulator Stack & Queue
+      </h1>
+      <p class="text-[var(--muted-foreground,#9ca3af)] text-sm">Belajar struktur data dengan visualisasi interaktif</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex justify-center gap-1 mb-0">
+      <button id="tabStack" class="tab-btn active-stack" onclick="switchTab('stack')">
+        🥞 Stack
+      </button>
+      <button id="tabQueue" class="tab-btn" onclick="switchTab('queue')">
+        🚶‍♂️ Queue (Antrian)
+      </button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="bg-[var(--card,#1e1e2e)] border border-[var(--border,#333)] rounded-b-xl rounded-tr-xl p-5 shadow-lg">
+
+      <!-- ===== STACK SECTION ===== -->
+      <div id="sectionStack">
+        <!-- Concept Card -->
+        <div class="concept-card stack-concept mb-4">
+          <div class="font-bold text-indigo-400 mb-1">💡 Apa itu Stack?</div>
+          <p class="text-[var(--foreground,#e5e5e5)]">
+            Stack = <strong>Tumpukan</strong>. Bayangkan tumpukan piring: piring yang <strong>terakhir ditaruh</strong> akan <strong>pertama diambil</strong>.
+            Prinsip ini disebut <strong class="text-indigo-400">LIFO (Last In, First Out)</strong>.
+          </p>
+          <div class="flex items-center gap-4 mt-2 text-[var(--muted-foreground,#9ca3af)]">
+            <span>⬆️ <strong>Push</strong> = Taruh di atas</span>
+            <span>⬇️ <strong>Pop</strong> = Ambil dari atas</span>
+            <span>👆 <strong>TOP</strong> = Elemen paling atas</span>
+          </div>
+        </div>
+
+        <!-- Input & Controls -->
+        <div class="flex flex-wrap gap-3 mb-4 items-end">
+          <div class="flex-1 min-w-[150px]">
+            <label class="text-xs font-semibold text-[var(--muted-foreground,#9ca3af)] mb-1 block">Masukkan Nilai</label>
+            <input id="stackInput" type="text" placeholder="Contoh: 42" maxlength="10"
+              onkeydown="if(event.key==='Enter') pushStack()">
+          </div>
+          <button class="action-btn btn-push" onclick="pushStack()">
+            ⬆️ Push
+          </button>
+          <button class="action-btn btn-pop" onclick="popStack()" id="btnPopStack">
+            ⬇️ Pop
+          </button>
+          <button class="action-btn btn-clear" onclick="clearStack()">
+            🗑️ Reset
+          </button>
+        </div>
+
+        <!-- Status Bar -->
+        <div id="stackStatus" class="status-bar bg-[var(--content,#161625)] border border-[var(--border,#333)] mb-4">
+          <span>📊</span>
+          <span>Stack kosong — Silakan push elemen!</span>
+        </div>
+
+        <!-- Stack Visualization -->
+        <div class="relative">
+          <!-- Arrow Labels -->
+          <div class="absolute -left-2 top-0 flex flex-col items-center z-10" id="stackArrowTop" style="display:none;">
+            <div class="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg">
+              TOP ☝️
+            </div>
+            <div class="w-0.5 h-4 bg-amber-500"></div>
+            <div class="text-amber-500">▼</div>
+          </div>
+
+          <div id="stackContainer" class="container-stack">
+            <div class="empty-msg" id="stackEmpty">
+              Stack kosong 📭<br><span class="text-xs">Push elemen untuk memulai!</span>
+            </div>
+          </div>
+
+          <!-- Bottom label -->
+          <div class="text-center mt-2">
+            <span class="text-xs font-semibold text-[var(--muted-foreground,#9ca3af)] bg-[var(--content,#161625)] px-3 py-1 rounded-full border border-[var(--border,#333)]">
+              ⬇️ BAWAH (Elemen pertama masuk)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== QUEUE SECTION ===== -->
+      <div id="sectionQueue" style="display:none;">
+        <!-- Concept Card -->
+        <div class="concept-card queue-concept mb-4">
+          <div class="font-bold text-emerald-400 mb-1">💡 Apa itu Queue?</div>
+          <p class="text-[var(--foreground,#e5e5e5)]">
+            Queue = <strong>Antrian</strong>. Bayangkan antrian di kasir: orang yang <strong>pertama mengantri</strong> akan <strong>pertama dilayani</strong>.
+            Prinsip ini disebut <strong class="text-emerald-400">FIFO (First In, First Out)</strong>.
+          </p>
+          <div class="flex items-center gap-4 mt-2 text-[var(--muted-foreground,#9ca3af)]">
+            <span>➡️ <strong>Enqueue</strong> = Masuk antrian (belakang)</span>
+            <span>⬅️ <strong>Dequeue</strong> = Keluar antrian (depan)</span>
+          </div>
+        </div>
+
+        <!-- Input & Controls -->
+        <div class="flex flex-wrap gap-3 mb-4 items-end">
+          <div class="flex-1 min-w-[150px]">
+            <label class="text-xs font-semibold text-[var(--muted-foreground,#9ca3af)] mb-1 block">Masukkan Nilai</label>
+            <input id="queueInput" type="text" placeholder="Contoh: 7" maxlength="10"
+              onkeydown="if(event.key==='Enter') enqueue()">
+          </div>
+          <button class="action-btn btn-enqueue" onclick="enqueue()">
+            ➡️ Enqueue
+          </button>
+          <button class="action-btn btn-dequeue" onclick="dequeue()" id="btnDequeue">
+            ⬅️ Dequeue
+          </button>
+          <button class="action-btn btn-clear" onclick="clearQueue()">
+            🗑️ Reset
+          </button>
+        </div>
+
+        <!-- Status Bar -->
+        <div id="queueStatus" class="status-bar bg-[var(--content,#161625)] border border-[var(--border,#333)] mb-4">
+          <span>📊</span>
+          <span>Queue kosong — Silakan enqueue elemen!</span>
+        </div>
+
+        <!-- Queue Visualization -->
+        <div class="relative">
+          <!-- Direction arrows -->
+          <div class="flex justify-between mb-2 px-2">
+            <span class="text-xs font-bold text-emerald-400">🚪 KELUAR (Depan)</span>
+            <span class="flex items-center gap-1 text-xs text-[var(--muted-foreground,#9ca3af)]">
+              Arah keluar ◀️ ─ ─ ─ ─ ─ ─ ─ ─ ─ ▶️ Arah masuk
+            </span>
+            <span class="text-xs font-bold text-purple-400">🚪 MASUK (Belakang)</span>
+          </div>
+
+          <div id="queueContainer" class="container-queue">
+            <div class="empty-msg" id="queueEmpty">
+              Queue kosong 📭 — Enqueue elemen untuk memulai!
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== LOG SECTION ===== -->
+      <div class="mt-5">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-bold text-sm flex items-center gap-2">
+            📝 Riwayat Operasi
+            <span id="logCount" class="text-xs bg-[var(--content,#161625)] px-2 py-0.5 rounded-full text-[var(--muted-foreground,#9ca3af)]">0 operasi</span>
+          </h3>
+          <button class="text-xs text-[var(--muted-foreground,#9ca3af)] hover:text-red-400 transition-colors cursor-pointer" onclick="clearLog()">
+            Hapus Log
+          </button>
+        </div>
+        <div id="logPanel" class="log-panel flex flex-col gap-2">
+          <div class="log-entry log-info log-enter">
+            <span>🎓</span>
+            <span>Selamat datang! Mulai simulasi dengan memasukkan nilai dan klik Push/Enqueue.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center mt-4 text-xs text-[var(--muted-foreground,#9ca3af)]">
+      Stack & Queue Simulator — Untuk Pembelajaran Struktur Data
+    </div>
+  </div>
+
+  <script>
+    // ===== DATA =====
+    let stackData = [];
+    let queueData = [];
+    let logEntries = 0;
+    let animating = false;
+
+    const COLORS = [
+      'from-indigo-500 to-blue-500',
+      'from-purple-500 to-pink-500',
+      'from-emerald-500 to-teal-500',
+      'from-amber-500 to-orange-500',
+      'from-rose-500 to-red-500',
+      'from-cyan-500 to-sky-500',
+      'from-fuchsia-500 to-purple-500',
+      'from-lime-500 to-green-500',
+    ];
+
+    function getColor(index) {
+      return COLORS[index % COLORS.length];
+    }
+
+    // ===== TAB SWITCHING =====
+    function switchTab(tab) {
+      const tabStack = document.getElementById('tabStack');
+      const tabQueue = document.getElementById('tabQueue');
+      const sectionStack = document.getElementById('sectionStack');
+      const sectionQueue = document.getElementById('sectionQueue');
+
+      if (tab === 'stack') {
+        tabStack.className = 'tab-btn active-stack';
+        tabQueue.className = 'tab-btn';
+        sectionStack.style.display = 'block';
+        sectionQueue.style.display = 'none';
+      } else {
+        tabStack.className = 'tab-btn';
+        tabQueue.className = 'tab-btn active-queue';
+        sectionStack.style.display = 'none';
+        sectionQueue.style.display = 'block';
+      }
+    }
+
+    // ===== STACK OPERATIONS =====
+    function pushStack() {
+      if (animating) return;
+      const input = document.getElementById('stackInput');
+      const val = input.value.trim();
+      if (!val) {
+        input.classList.add('shake-error');
+        setTimeout(() => input.classList.remove('shake-error'), 400);
+        return;
+      }
+      if (stackData.length >= 10) {
+        addLog('⚠️ Stack penuh! Maksimal 10 elemen.', 'info');
+        return;
+      }
+
+      animating = true;
+      stackData.push(val);
+      input.value = '';
+      renderStack('push');
+      addLog(`⬆️ <strong>PUSH "${val}"</strong> — Elemen ditaruh di <strong>atas</strong> tumpukan. Ukuran stack: ${stackData.length}`, 'push');
+      updateStackStatus();
+      setTimeout(() => { animating = false; }, 600);
+    }
+
+    function popStack() {
+      if (animating) return;
+      if (stackData.length === 0) {
+        addLog('❌ <strong>Stack Underflow!</strong> Tidak bisa POP karena stack kosong.', 'info');
+        document.getElementById('stackContainer').classList.add('shake-error');
+        setTimeout(() => document.getElementById('stackContainer').classList.remove('shake-error'), 400);
+        return;
+      }
+
+      animating = true;
+      const val = stackData[stackData.length - 1];
+
+      // Animate removal
+      const container = document.getElementById('stackContainer');
+      const topEl = container.lastElementChild;
+      if (topEl && !topEl.classList.contains('empty-msg')) {
+        topEl.classList.add('element-exit-stack');
+        setTimeout(() => {
+          stackData.pop();
+          renderStack();
+          addLog(`⬇️ <strong>POP "${val}"</strong> — Elemen paling <strong>atas</strong> diambil dari tumpukan. Ukuran stack: ${stackData.length}`, 'pop');
+          updateStackStatus();
+          animating = false;
+        }, 400);
+      } else {
+        stackData.pop();
+        renderStack();
+        updateStackStatus();
+        animating = false;
+      }
+    }
+
+    function clearStack() {
+      stackData = [];
+      renderStack();
+      updateStackStatus();
+      addLog('🗑️ Stack di-<strong>reset</strong>. Semua elemen dihapus.', 'info');
+    }
+
+    function renderStack(mode) {
+      const container = document.getElementById('stackContainer');
+      const empty = document.getElementById('stackEmpty');
+
+      // Clear
+      container.innerHTML = '';
+
+      if (stackData.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty-msg';
+        emptyDiv.id = 'stackEmpty';
+        emptyDiv.innerHTML = 'Stack kosong 📭<br><span class="text-xs">Push elemen untuk memulai!</span>';
+        container.appendChild(emptyDiv);
+        return;
+      }
+
+      stackData.forEach((val, i) => {
+        const isTop = i === stackData.length - 1;
+        const isNew = mode === 'push' && isTop;
+
+        const el = document.createElement('div');
+        el.className = `stack-element relative w-full max-w-xs mx-auto`;
+        el.innerHTML = `
+          <div class="bg-gradient-to-r ${getColor(i)} rounded-xl px-4 py-3 text-white font-bold text-center shadow-lg
+            ${isNew ? 'element-enter-stack' : 'element-pop-in'}
+            ${isTop ? 'pulse-glow' : ''}"
+            style="animation-delay: ${isNew ? '0s' : (i * 0.05) + 's'}">
+            <div class="flex items-center justify-between">
+              <span class="text-xs opacity-70">index ${i}</span>
+              <span class="text-lg">${escapeHtml(val)}</span>
+              <span class="text-xs opacity-70">${isTop ? '👆 TOP' : ''}</span>
+            </div>
+          </div>
+          ${isTop ? '<div class="top-indicator">TOP</div>' : ''}
+        `;
+        container.appendChild(el);
+      });
+    }
+
+    function updateStackStatus() {
+      const status = document.getElementById('stackStatus');
+      if (stackData.length === 0) {
+        status.innerHTML = '<span>📊</span><span>Stack kosong — Silakan push elemen!</span>';
+        status.className = 'status-bar bg-[var(--content,#161625)] border border-[var(--border,#333)] mb-4';
+      } else {
+        const top = stackData[stackData.length - 1];
+        status.innerHTML = `<span>📊</span><span>Ukuran: <strong>${stackData.length}</strong> | TOP: <strong>"${escapeHtml(top)}"</strong> (index ${stackData.length - 1}) | Isi: [${stackData.map(v => escapeHtml(v)).join(', ')}]</span>`;
+        status.className = 'status-bar bg-indigo-500/10 border border-indigo-500/30 mb-4 text-indigo-300';
+      }
+    }
+
+    // ===== QUEUE OPERATIONS =====
+    function enqueue() {
+      if (animating) return;
+      const input = document.getElementById('queueInput');
+      const val = input.value.trim();
+      if (!val) {
+        input.classList.add('shake-error');
+        setTimeout(() => input.classList.remove('shake-error'), 400);
+        return;
+      }
+      if (queueData.length >= 10) {
+        addLog('⚠️ Queue penuh! Maksimal 10 elemen.', 'info');
+        return;
+      }
+
+      animating = true;
+      queueData.push(val);
+      input.value = '';
+      renderQueue('enqueue');
+      addLog(`➡️ <strong>ENQUEUE "${val}"</strong> — Elemen masuk dari <strong>belakang</strong> antrian. Ukuran queue: ${queueData.length}`, 'enqueue');
+      updateQueueStatus();
+      setTimeout(() => { animating = false; }, 600);
+    }
+
+    function dequeue() {
+      if (animating) return;
+      if (queueData.length === 0) {
+        addLog('❌ <strong>Queue Underflow!</strong> Tidak bisa DEQUEUE karena queue kosong.', 'info');
+        document.getElementById('queueContainer').classList.add('shake-error');
+        setTimeout(() => document.getElementById('queueContainer').classList.remove('shake-error'), 400);
+        return;
+      }
+
+      animating = true;
+      const val = queueData[0];
+
+      // Animate removal
+      const container = document.getElementById('queueContainer');
+      const firstEl = container.firstElementChild;
+      if (firstEl && !firstEl.classList.contains('empty-msg')) {
+        firstEl.classList.add('element-exit-queue');
+        setTimeout(() => {
+          queueData.shift();
+          renderQueue();
+          addLog(`⬅️ <strong>DEQUEUE "${val}"</strong> — Elemen paling <strong>depan</strong> keluar dari antrian. Ukuran queue: ${queueData.length}`, 'dequeue');
+          updateQueueStatus();
+          animating = false;
+        }, 400);
+      } else {
+        queueData.shift();
+        renderQueue();
+        updateQueueStatus();
+        animating = false;
+      }
+    }
+
+    function clearQueue() {
+      queueData = [];
+      renderQueue();
+      updateQueueStatus();
+      addLog('🗑️ Queue di-<strong>reset</strong>. Semua elemen dihapus.', 'info');
+    }
+
+    function renderQueue(mode) {
+      const container = document.getElementById('queueContainer');
+      container.innerHTML = '';
+
+      if (queueData.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty-msg';
+        emptyDiv.id = 'queueEmpty';
+        emptyDiv.innerHTML = 'Queue kosong 📭 — Enqueue elemen untuk memulai!';
+        container.appendChild(emptyDiv);
+        return;
+      }
+
+      queueData.forEach((val, i) => {
+        const isFront = i === 0;
+        const isBack = i === queueData.length - 1;
+        const isNew = mode === 'enqueue' && isBack;
+
+        const el = document.createElement('div');
+        el.className = 'queue-element relative flex-shrink-0';
+        el.innerHTML = `
+          <div class="bg-gradient-to-br ${getColor(i)} rounded-xl px-5 py-4 text-white font-bold text-center shadow-lg min-w-[80px]
+            ${isNew ? 'element-enter-queue' : 'element-pop-in'}
+            ${isFront ? 'pulse-glow' : ''}"
+            style="animation-delay: ${isNew ? '0s' : (i * 0.05) + 's'}">
+            <div class="text-lg">${escapeHtml(val)}</div>
+            <div class="text-xs opacity-70 mt-1">pos ${i}</div>
+          </div>
+          ${isFront ? '<div class="front-indicator">DEPAN 🟢</div>' : ''}
+          ${isBack ? '<div class="back-indicator">BELAKANG 🟣</div>' : ''}
+        `;
+        container.appendChild(el);
+      });
+    }
+
+    function updateQueueStatus() {
+      const status = document.getElementById('queueStatus');
+      if (queueData.length === 0) {
+        status.innerHTML = '<span>📊</span><span>Queue kosong — Silakan enqueue elemen!</span>';
+        status.className = 'status-bar bg-[var(--content,#161625)] border border-[var(--border,#333)] mb-4';
+      } else {
+        const front = queueData[0];
+        const back = queueData[queueData.length - 1];
+        status.innerHTML = `<span>📊</span><span>Ukuran: <strong>${queueData.length}</strong> | DEPAN: <strong>"${escapeHtml(front)}"</strong> | BELAKANG: <strong>"${escapeHtml(back)}"</strong> | Isi: [${queueData.map(v => escapeHtml(v)).join(' → ')}]</span>`;
+        status.className = 'status-bar bg-emerald-500/10 border border-emerald-500/30 mb-4 text-emerald-300';
+      }
+    }
+
+    // ===== LOG =====
+    function addLog(msg, type) {
+      logEntries++;
+      const panel = document.getElementById('logPanel');
+      const entry = document.createElement('div');
+
+      const typeClass = {
+        push: 'log-push',
+        pop: 'log-pop',
+        enqueue: 'log-enqueue',
+        dequeue: 'log-dequeue',
+        info: 'log-info'
+      }[type] || 'log-info';
+
+      const now = new Date();
+      const time = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      entry.className = `log-entry ${typeClass} log-enter`;
+      entry.innerHTML = `
+        <span class="text-xs text-[var(--muted-foreground,#9ca3af)] whitespace-nowrap">${time}</span>
+        <span class="text-xs font-mono bg-black/20 px-1.5 py-0.5 rounded">#${logEntries}</span>
+        <span>${msg}</span>
+      `;
+
+      // Insert at top
+      panel.insertBefore(entry, panel.firstChild);
+      document.getElementById('logCount').textContent = `${logEntries} operasi`;
+    }
+
+    function clearLog() {
+      logEntries = 0;
+      document.getElementById('logPanel').innerHTML = '';
+      document.getElementById('logCount').textContent = '0 operasi';
+    }
+
+    // ===== HELPERS =====
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
